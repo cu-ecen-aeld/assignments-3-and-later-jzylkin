@@ -1,4 +1,8 @@
 #include "systemcalls.h"
+#include <unistd.h>
+#include <stdlib.h>
+#include <sys/wait.h>
+#include <fcntl.h>
 
 /**
  * @param cmd the command to execute with system()
@@ -11,13 +15,13 @@ bool do_system(const char *cmd)
 {
 
 /*
- * TODO  add your code here
  *  Call the system() function with the command set in the cmd
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
 
-    return true;
+    int retval = system(cmd);
+    return (retval >= 0);
 }
 
 /**
@@ -57,10 +61,46 @@ bool do_exec(int count, ...)
  *   (first argument to execv), and use the remaining arguments
  *   as second argument to the execv() command.
  *
+ *  
 */
+    int pid = fork();
+    if (pid < 0)
+    {
+	    printf("failed to fork");
+	         va_end(args);
+		 return false;
+    }
+    else if (pid == 0)
+    {
+        // Running as child
+        if (execv(command[0], &command[0]) < 0)
+	{
+	    exit(1);
+	}
+    }
+    else
+    {
+	int status;
+        if (waitpid(pid, &status, 0) < 0)
+	{
+	     va_end(args);
+	     return false;
+	}
+	
+	if ( WIFEXITED(status) )
+	{
+		int es = WEXITSTATUS(status);
+		if (es !=0 )
+		{
+			return false;
+		}
+	}
+
+    }
 
     va_end(args);
-
+    
+    
     return true;
 }
 
@@ -92,8 +132,21 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
+    int fd = open(outputfile, O_WRONLY);
+    if (fd > 0)
+    {
+    	dup2(fd, 1);
+    }
+    else
+    {
+	printf("could not open redirect file");
+	va_end(args);
+	return false;
+    }
+
+    execv(command[0], command);
 
     va_end(args);
 
-    return true;
+    return false;
 }
